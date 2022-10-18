@@ -119,15 +119,14 @@ class JSONSerialization(Serialization):
     @classmethod
     def _get_method(cls, ptype, suffix):
         "Returns specialized method if available, otherwise None"
-        method_name = ptype.lower()+'_' + suffix
+        method_name = f'{ptype.lower()}_{suffix}'
         return getattr(cls, method_name, None)
 
     @classmethod
     def param_schema(cls, ptype, p, safe=False, subset=None):
         if ptype in cls.unserializable_parameter_types:
             raise UnserializableException
-        dispatch_method = cls._get_method(ptype, 'schema')
-        if dispatch_method:
+        if dispatch_method := cls._get_method(ptype, 'schema'):
             schema = dispatch_method(p, safe=safe)
         else:
             schema = {'type': ptype.lower()}
@@ -249,9 +248,7 @@ class JSONSerialization(Serialization):
         try:
             allowed_types = [{'type': cls.json_schema_literal_types[type(obj)]}
                              for obj in p.objects]
-            schema = {'anyOf': allowed_types}
-            schema['enum'] = p.objects
-            return schema
+            return {'anyOf': allowed_types, 'enum': p.objects}
         except:
             if safe is True:
                 msg = ('ObjectSelector cannot be guaranteed to be safe for '
@@ -264,9 +261,7 @@ class JSONSerialization(Serialization):
         try:
             allowed_types = [{'type': cls.json_schema_literal_types[type(obj)]}
                              for obj in p.objects.values()]
-            schema = {'anyOf': allowed_types}
-            schema['enum'] = p.objects
-            return schema
+            return {'anyOf': allowed_types, 'enum': p.objects}
         except:
             if safe is True:
                 msg = ('Selector cannot be guaranteed to be safe for '
@@ -283,7 +278,7 @@ class JSONSerialization(Serialization):
             return {'type': 'array'}
         for obj in p.objects:
             if type(obj) not in cls.json_schema_literal_types:
-                msg = 'ListSelector cannot serialize type %s' % type(obj)
+                msg = f'ListSelector cannot serialize type {type(obj)}'
                 raise UnserializableException(msg)
         return {'type': 'array', 'items': {'enum': p.objects}}
 
@@ -304,11 +299,11 @@ class JSONSerialization(Serialization):
         elif isinstance(p.columns, tuple):
             mincols, maxcols = p.columns
 
-        if isinstance(p.columns, int) or isinstance(p.columns, tuple):
+        if isinstance(p.columns, (int, tuple)):
             schema['items'] =  {'type': 'object', 'minItems': mincols,
                                 'maxItems': maxcols}
 
-        if isinstance(p.columns, list) or isinstance(p.columns, set):
+        if isinstance(p.columns, (list, set)):
             literal_types = [{'type':el} for el in cls.json_schema_literal_types.values()]
             allowable_types = {'anyOf': literal_types}
             properties = {name: allowable_types for name in p.columns}

@@ -100,7 +100,7 @@ class TestTimeClass(unittest.TestCase):
             t.advance(0.25)
             self.assertEqual(t(), gmpy.mpq(3,4))
         self.assertEqual(t(), gmpy.mpq(1,2))
-        tvals = [tval for tval in t]
+        tvals = list(t)
         self.assertEqual(tvals, [gmpy.mpq(1,2),
                                  gmpy.mpq(3,4),
                                  gmpy.mpq(1,1),

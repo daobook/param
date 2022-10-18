@@ -4,7 +4,7 @@ from nbsite.shared_conf import *
 
 project = u'param'
 authors = u'HoloViz developers'
-copyright = u'2003-2022 ' + authors
+copyright = f'2003-2022 {authors}'
 description = 'Declarative Python programming using Parameters'
 
 import param

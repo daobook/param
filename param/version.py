@@ -83,8 +83,8 @@ class Version(object):
         # If called in the old way, provide the previous class. Means
         # PEP440/tag based workflow warning below will never appear.
         if ('release' in kw and kw['release'] is not None) or \
-           ('dev' in kw and kw['dev'] is not None) or \
-           ('commit_count' in kw):
+               ('dev' in kw and kw['dev'] is not None) or \
+               ('commit_count' in kw):
             return OldDeprecatedVersion(**kw)
         else:
             return super(Version, cls).__new__(cls)
@@ -179,11 +179,8 @@ class Version(object):
                 # been copied/installed into it).
                 remotes = run_cmd([cmd, 'remote', '-v'],
                                   cwd=os.path.dirname(self.fpath))
-                repo_matches = ['/' + self.reponame + '.git' ,
-                                # A remote 'server:reponame.git' can also be referred
-                                # to (i.e. cloned) as `server:reponame`.
-                                '/' + self.reponame + ' ']
-                if not any(m in remotes for m in repo_matches):
+                repo_matches = [f'/{self.reponame}.git', f'/{self.reponame} ']
+                if all(m not in remotes for m in repo_matches):
                     try:
                         output = self._output_from_file()
                         if output is not None:
@@ -224,11 +221,7 @@ class Version(object):
         The commit is known to be from a file (and therefore stale) if a
         SHA is supplied by git archive and doesn't match the parsed commit.
         """
-        if self._output_from_file() is None:
-            commit = None
-        else:
-            commit = self.commit
-
+        commit = None if self._output_from_file() is None else self.commit
         known_stale = (self.archive_commit is not None
                        and not self.archive_commit.startswith('$Format')
                        and self.archive_commit != commit)
@@ -283,15 +276,18 @@ class Version(object):
         (with "v" prefix removed).
         """
         known_stale = self._known_stale()
-        if self.release is None and not known_stale:
+        if known_stale:
+            if self.release is None:
+                extracted_directory_tag = self._output_from_file(entry='extracted_directory_tag')
+                return (
+                    extracted_directory_tag
+                    if extracted_directory_tag is not None
+                    else '0.0.0+g{SHA}-gitarchive'.format(SHA=self.archive_commit)
+                )
+
+        elif self.release is None:
             extracted_directory_tag = self._output_from_file(entry='extracted_directory_tag')
             return 'None' if extracted_directory_tag is None else extracted_directory_tag
-        elif self.release is None and known_stale:
-            extracted_directory_tag = self._output_from_file(entry='extracted_directory_tag')
-            if extracted_directory_tag is not None:
-                return extracted_directory_tag
-            return '0.0.0+g{SHA}-gitarchive'.format(SHA=self.archive_commit)
-
         release = '.'.join(str(el) for el in self.release)
         prerelease = '' if self.prerelease is None else self.prerelease
 
@@ -306,15 +302,21 @@ class Version(object):
             commit = self.archive_commit
 
         if archive_commit != '':
-            postcount = self.commit_count_prefix + '0'
+            postcount = f'{self.commit_count_prefix}0'
         elif self.commit_count not in [0, None]:
             postcount = self.commit_count_prefix + str(self.commit_count)
         else:
             postcount = ''
 
-        components = [release, prerelease, postcount,
-                      '' if commit is None else '+g' + commit, dirty,
-                      archive_commit]
+        components = [
+            release,
+            prerelease,
+            postcount,
+            '' if commit is None else f'+g{commit}',
+            dirty,
+            archive_commit,
+        ]
+
         return ''.join(components)
 
     def __repr__(self):
@@ -381,11 +383,7 @@ class Version(object):
 
         fpath = os.path.join(setup_path, pkgname, "__init__.py")
         version = Version(fpath=fpath, reponame=reponame, archive_commit=archive_commit)
-        if describe:
-            vstring = version.git_fetch(as_string=True)
-        else:
-            vstring = str(version)
-
+        vstring = version.git_fetch(as_string=True) if describe else str(version)
         if version.dirty and dirty == 'raise':
             raise AssertionError('Repository is in a dirty state.')
         elif version.dirty and dirty=='strip':
@@ -397,7 +395,7 @@ class Version(object):
     @classmethod
     def extract_directory_tag(cls, setup_path, reponame):
         setup_dir = os.path.split(setup_path)[-1] # Directory containing setup.py
-        prefix = reponame + '-' # Prefix to match
+        prefix = f'{reponame}-'
         if setup_dir.startswith(prefix):
             tag = setup_dir[len(prefix):]
             # Assuming the tag is a version if it isn't empty, 'master' and has a dot in it
@@ -526,7 +524,10 @@ def get_setupcfg_version():
     ###
     # hack archive_commit into section heading; see docstring
     archive_commit = None
-    archive_commit_key = autover_section+'.configparser_workaround.archive_commit'
+    archive_commit_key = (
+        f'{autover_section}.configparser_workaround.archive_commit'
+    )
+
     for section in config.sections():
         if section.startswith(archive_commit_key):
             archive_commit = re.match(r".*=\s*(\S*)\s*",section).group(1)
@@ -645,11 +646,8 @@ class OldDeprecatedVersion(object):
                 # been copied/installed into it).
                 output = run_cmd([cmd, 'remote', '-v'],
                                  cwd=os.path.dirname(self.fpath))
-                repo_matches = ['/' + self.reponame + '.git' ,
-                                # A remote 'server:reponame.git' can also be referred
-                                # to (i.e. cloned) as `server:reponame`.
-                                '/' + self.reponame + ' ']
-                if not any(m in output for m in repo_matches):
+                repo_matches = [f'/{self.reponame}.git', f'/{self.reponame} ']
+                if all(m not in output for m in repo_matches):
                     return self
 
             output = run_cmd([cmd, 'describe', '--long', '--match', 'v*.*', '--dirty'],
@@ -702,8 +700,7 @@ class OldDeprecatedVersion(object):
             return release
 
         dirty_status = '-dirty' if self.dirty else ''
-        return '%s-%s-g%s%s' % (release, self.commit_count if self.commit_count else 'x',
-                                self.commit, dirty_status)
+        return f"{release}-{self.commit_count or 'x'}-g{self.commit}{dirty_status}"
 
     def __repr__(self):
         return str(self)
@@ -730,21 +727,17 @@ class OldDeprecatedVersion(object):
                 == (other.release, other.commit_count, other.dev))
 
     def __gt__(self, other):
-        if self.release == other.release:
-            if self.dev == other.dev:
-                return self.commit_count > other.commit_count
-            elif None in [self.dev, other.dev]:
-                return self.dev is None
-            else:
-                return self.dev > other.dev
-        else:
+        if self.release != other.release:
             return (self.release, self.commit_count) > (other.release, other.commit_count)
+        if self.dev == other.dev:
+            return self.commit_count > other.commit_count
+        elif None in [self.dev, other.dev]:
+            return self.dev is None
+        else:
+            return self.dev > other.dev
 
     def __lt__(self, other):
-        if self==other:
-            return False
-        else:
-            return not (self > other)
+        return False if self==other else not (self > other)
 
 
     def verify(self, string_version=None):

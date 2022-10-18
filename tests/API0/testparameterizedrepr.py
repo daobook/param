@@ -157,5 +157,6 @@ class TestParameterizedRepr(unittest.TestCase):
         self.assertEqual(obj.pprint(qualify=False),
                          r)
 
-        self.assertEqual(obj.pprint(qualify=True),
-                         "tests.API0.testparameterizedrepr."+r)
+        self.assertEqual(
+            obj.pprint(qualify=True), f"tests.API0.testparameterizedrepr.{r}"
+        )
