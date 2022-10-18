@@ -64,7 +64,7 @@ class ParamPager(object):
         params = dict(obj.param.objects('existing'))
         if isinstance(obj,type):
             changed = []
-            val_dict = dict((k,p.default) for (k,p) in params.items())
+            val_dict = {k: p.default for (k,p) in params.items()}
             self_class = obj
         else:
             changed = list(obj.param.values(onlychanged=True).keys())
@@ -72,8 +72,10 @@ class ParamPager(object):
             self_class = obj.__class__
 
         if not include_super:
-            params = dict((k,v) for (k,v) in params.items()
-                          if k in self_class.__dict__)
+            params = {
+                k: v for (k, v) in params.items() if k in self_class.__dict__
+            }
+
 
         params.pop('name') # Already displayed in the title.
         return (params, val_dict, changed)
@@ -88,16 +90,16 @@ class ParamPager(object):
 
         (params, val_dict, changed) = info
         contents = []
-        displayed_params = []
-        for name in self.sort_by_precedence(params):
-            if only_changed and not (name in changed):
-                continue
-            displayed_params.append((name, params[name]))
+        displayed_params = [
+            (name, params[name])
+            for name in self.sort_by_precedence(params)
+            if not only_changed or name in changed
+        ]
 
         right_shift = max(len(name) for name, _ in displayed_params)+2
 
         for i, (name, p) in enumerate(displayed_params):
-            heading = "%s: " % name
+            heading = f"{name}: "
             unindented = textwrap.dedent("< No docstring available >" if p.doc is None else p.doc)
 
             if (WARN_MISFORMATTED_DOCSTRINGS
@@ -110,7 +112,7 @@ class ParamPager(object):
 
             lines = unindented.splitlines()
             if len(lines) > 1:
-                tail = ['%s%s' % (' '  * right_shift, line) for line in lines[1:]]
+                tail = [f"{' ' * right_shift}{line}" for line in lines[1:]]
                 all_lines = [ heading.ljust(right_shift) + lines[0]] + tail
             elif len(lines) == 1:
                 all_lines = [ heading.ljust(right_shift) + lines[0]]
@@ -132,7 +134,7 @@ class ParamPager(object):
         same precedence; for Python 2 sorts them lexicographically by name,
         unless explicit precedences are provided.
         """
-        params = [(p, pobj) for p, pobj in parameters.items()]
+        params = list(parameters.items())
         key_fn = lambda x: x[1].precedence if x[1].precedence is not None else 1e-8
         sorted_params = sorted(params, key=key_fn)
         groups = itertools.groupby(sorted_params, key=key_fn)
@@ -143,9 +145,12 @@ class ParamPager(object):
             all(p.precedence is not None for p in parameters.values())
         )
         ordered_groups = [list(grp) if dict_ordered else sorted(grp) for (_, grp) in groups]
-        ordered_params = [el[0] for group in ordered_groups for el in group
-                          if (el[0] != 'name' or el[0] in parameters)]
-        return ordered_params
+        return [
+            el[0]
+            for group in ordered_groups
+            for el in group
+            if (el[0] != 'name' or el[0] in parameters)
+        ]
 
 
     def _build_table(self, info, order, max_col_len=40, only_changed=False):
@@ -156,23 +161,23 @@ class ParamPager(object):
 
         info_list, bounds_dict = [], {}
         (params, val_dict, changed) = info
-        col_widths = dict((k,0) for k in order)
+        col_widths = {k: 0 for k in order}
 
         ordering = self.sort_by_precedence(params)
         for name in ordering:
             p = params[name]
-            if only_changed and not (name in changed):
+            if only_changed and name not in changed:
                 continue
 
             constant = 'C' if p.constant else 'V'
             readonly = 'RO' if p.readonly else 'RW'
             allow_None = ' AN' if hasattr(p, 'allow_None') and p.allow_None else ''
 
-            mode = '%s %s%s' % (constant, readonly, allow_None)
+            mode = f'{constant} {readonly}{allow_None}'
 
             value = repr(val_dict[name])
             if len(value) > (max_col_len - 3):
-                value = value[:max_col_len-3] + '...'
+                value = f'{value[:max_col_len - 3]}...'
 
             p_dict = {'name': name, 'type': p.__class__.__name__,
                       'mode': mode, 'value': value}
@@ -193,7 +198,7 @@ class ParamPager(object):
 
                 if (lbound, ubound) != (None,None):
                     bounds_dict[name] = (mark_lbound, mark_ubound)
-                    p_dict['bounds'] = '(%s, %s)' % (lbound, ubound)
+                    p_dict['bounds'] = f'({lbound}, {ubound})'
 
             for col in p_dict:
                 max_width = max([col_widths[col], len(p_dict[col])])
@@ -217,7 +222,7 @@ class ParamPager(object):
         """
 
         contents, tail = [], []
-        column_set = set(k for _, row in info_list for k in row)
+        column_set = {k for _, row in info_list for k in row}
         columns = [col for col in order if col in column_set]
 
         title_row = []
@@ -242,9 +247,9 @@ class ParamPager(object):
                     lval, uval = formatted.rsplit(',')
                     lspace, lstr = lval.rsplit('(')
                     ustr, uspace = uval.rsplit(')')
-                    lbound = lspace + '('+(cyan % lstr) if mark_lbound else lval
+                    lbound = f'{lspace}(' + cyan % lstr if mark_lbound else lval
                     ubound = (cyan % ustr)+')'+uspace if mark_ubound else uval
-                    formatted = "%s,%s" % (lbound, ubound)
+                    formatted = f"{lbound},{ubound}"
                 row_list.append(formatted)
 
             row_text = ''.join(row_list)
@@ -274,7 +279,7 @@ class ParamPager(object):
             if parameterized_object:
                 # Only show the name if not autogenerated
                 class_name = param_obj.__class__.__name__
-                default_name = re.match('^'+class_name+'[0-9]+$', param_obj.name)
+                default_name = re.match(f'^{class_name}[0-9]+$', param_obj.name)
                 obj_name = '' if default_name else (' %r' % param_obj.name)
                 title = 'Parameters of %r instance%s' % (class_name, obj_name)
 
@@ -304,8 +309,10 @@ class ParamPager(object):
         return "%s\n\n%s\n\n%s\n\n%s" % (top_heading, table, docstring_heading, docstrings)
 
 
-message = """Welcome to the param IPython extension! (https://param.holoviz.org/)"""
-message += '\nAvailable magics: %params'
+message = (
+    """Welcome to the param IPython extension! (https://param.holoviz.org/)"""
+    + '\nAvailable magics: %params'
+)
 
 _loaded = False
 

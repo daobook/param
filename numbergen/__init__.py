@@ -55,8 +55,7 @@ class TimeAware(param.Parameterized):
         If time_instance is True, time_fn must be a param.Time instance.
         """
         if time_instance and not isinstance(self.time_fn, param.Time):
-            raise AssertionError("%s requires a Time object"
-                                 % self.__class__.__name__)
+            raise AssertionError(f"{self.__class__.__name__} requires a Time object")
 
         if self.time_dependent:
             global_timefn = self.time_fn is param.Dynamic.time_fn
@@ -194,8 +193,7 @@ class UnaryOperator(NumberGenerator):
         return self.operator(self.operand(),**self.args)
 
     def pprint(self, *args, **kwargs):
-        return (pprint(self.operator, *args, **kwargs) + '(' +
-                pprint(self.operand,  *args, **kwargs) + ')')
+        return f'{pprint(self.operator, *args, **kwargs)}({pprint(self.operand, *args, **kwargs)})'
 
 
 class Hash(object):
@@ -365,7 +363,7 @@ class TimeAwareRandomState(TimeAware):
         if name is None:
             self._verify_constrained_hash()
 
-        hash_name = name if name else self.name
+        hash_name = name or self.name
         if not shared:  hash_name += suffix
         self._hashfn = Hash(hash_name, input_count=2)
 
@@ -506,8 +504,7 @@ class UniformRandomInt(RandomDistribution):
 
     def __call__(self):
         super(UniformRandomInt, self).__call__()
-        x = self.random_generator.randint(self.lbound,self.ubound)
-        return x
+        return self.random_generator.randint(self.lbound,self.ubound)
 
 
 
@@ -651,15 +648,12 @@ class SquareWave(NumberGenerator, TimeDependent):
             self.off_duration = self.duration
 
         if self.onset > self.off_duration:
-            raise AssertionError("Onset value needs to be less than %s" % self.onset)
+            raise AssertionError(f"Onset value needs to be less than {self.onset}")
 
 
     def __call__(self):
         phase_offset = (self.time_fn() - self.onset) % (self.duration + self.off_duration)
-        if phase_offset < self.duration:
-            return 1.0
-        else:
-            return 0.0
+        return 1.0 if phase_offset < self.duration else 0.0
 
 
 
@@ -763,5 +757,12 @@ class BoundedNumber(NumberGenerator):
         else: return val
 
 
-_public = list(set([_k for _k,_v in locals().items() if isinstance(_v,type) and issubclass(_v,NumberGenerator)]))
+_public = list(
+    {
+        _k
+        for _k, _v in locals().items()
+        if isinstance(_v, type) and issubclass(_v, NumberGenerator)
+    }
+)
+
 __all__ = _public

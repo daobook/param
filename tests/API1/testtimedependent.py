@@ -91,12 +91,9 @@ class TestTimeClass(API1TestCase):
         self.assertEqual(time(), 10)
         with time as t:
             self.assertEqual(t(), 10)
-            self.assertEqual(
-                [val for val in t],
-                [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
-            )
+            self.assertEqual(list(t), [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
             self.assertEqual(t(), 20)
-            'Time after iteration: %s' % t()
+            f'Time after iteration: {t()}'
             t += 2
             self.assertEqual(t(), 22)
         self.assertEqual(time(), 10)
@@ -120,7 +117,7 @@ class TestTimeClass(API1TestCase):
             t.advance(0.25)
             self.assertEqual(t(), gmpy.mpq(3,4))
         self.assertEqual(t(), gmpy.mpq(1,2))
-        tvals = [tval for tval in t]
+        tvals = list(t)
         self.assertEqual(tvals, [gmpy.mpq(1,2),
                                  gmpy.mpq(3,4),
                                  gmpy.mpq(1,1),

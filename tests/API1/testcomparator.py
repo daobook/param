@@ -35,11 +35,9 @@ if sys.version_info[0] >= 3:
     }
 
     if np:
-        _supported.update({
-            'np.datetime64': np.datetime64(_now),
-        })
+        _supported['np.datetime64'] = np.datetime64(_now)
     if pd:
-        _supported.update({'pd.Timestamp': pd.Timestamp(_now)})
+        _supported['pd.Timestamp'] = pd.Timestamp(_now)
 else:
     _supported = {}
 

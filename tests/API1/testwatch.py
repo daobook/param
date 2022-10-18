@@ -52,13 +52,11 @@ class WatchMethodExample(SimpleWatchSubclass):
 
     @param.depends('a', watch='queued')
     def _clip_a(self):
-        if self.a > 3:
-            self.a = 3
+        self.a = min(self.a, 3)
 
     @param.depends('b', watch=True)
     def _clip_b(self):
-        if self.b > 10:
-            self.b = 10
+        self.b = min(self.b, 10)
 
     @param.depends('b', watch=True)
     def _set_c(self):

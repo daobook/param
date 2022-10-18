@@ -2,6 +2,7 @@
 Do all subclasses of Parameter supply a valid default?
 """
 
+
 import unittest
 
 import pytest
@@ -28,8 +29,7 @@ except ImportError:
 try:
     import pandas # noqa
 except ImportError:
-    skip.append('DataFrame')
-    skip.append('Series')
+    skip.extend(('DataFrame', 'Series'))
 
 
 class DefaultsMetaclassTest(type):
@@ -46,7 +46,10 @@ class DefaultsMetaclassTest(type):
             return test
 
         for p_name, p_type in concrete_descendents(Parameter).items():
-            dict_["test_default_of_%s"%p_name] = add_test(p_type) if p_name not in skip else test_skip
+            dict_[f"test_default_of_{p_name}"] = (
+                add_test(p_type) if p_name not in skip else test_skip
+            )
+
 
         return type.__new__(mcs, name, bases, dict_)
 

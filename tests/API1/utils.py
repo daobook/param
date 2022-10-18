@@ -49,12 +49,12 @@ class MockLoggingHandler(logging.Handler):
         Assert that the last line captured at the given level ends with
         a particular substring.
         """
-        msg='\n\nparam.log({level},...): {last_line}\ndoes not end with:\n{substring}'
         last_line = self.tail(level, n=1)
         if len(last_line) == 0:
             raise AssertionError('Missing param.log({level},...) output: {substring}'.format(
                 level=level, substring=repr(substring)))
         if not last_line[0].endswith(substring):
+            msg='\n\nparam.log({level},...): {last_line}\ndoes not end with:\n{substring}'
             raise AssertionError(msg.format(level=level,
                                             last_line=repr(last_line[0]),
                                             substring=repr(substring)))
@@ -64,12 +64,12 @@ class MockLoggingHandler(logging.Handler):
         Assert that the last line captured at the given level contains a
         particular substring.
         """
-        msg='\n\nparam.log({level},...): {last_line}\ndoes not contain:\n{substring}'
         last_line = self.tail(level, n=1)
         if len(last_line) == 0:
             raise AssertionError('Missing {method} output: {substring}'.format(
                 level=level, substring=repr(substring)))
         if substring not in last_line[0]:
+            msg='\n\nparam.log({level},...): {last_line}\ndoes not contain:\n{substring}'
             raise AssertionError(msg.format(level=level,
                                             last_line=repr(last_line[0]),
                                             substring=repr(substring)))

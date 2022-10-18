@@ -131,7 +131,7 @@ class TestParameterized(unittest.TestCase):
         # CB: test not so good because it requires changes if params
         # of PO are changed
         assert 'name' in param.Parameterized.params()
-        assert len(param.Parameterized.params()) in [1,2]
+        assert len(param.Parameterized.params()) in {1, 2}
 
         ## check for bug where subclass Parameters were not showing up
         ## if params() already called on a super class.

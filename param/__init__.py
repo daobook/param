@@ -71,10 +71,7 @@ def produce_value(value_obj):
     object: if the object is callable, call it, otherwise return the
     object.
     """
-    if callable(value_obj):
-        return value_obj()
-    else:
-        return value_obj
+    return value_obj() if callable(value_obj) else value_obj
 
 
 def as_unicode(obj):
@@ -109,7 +106,7 @@ def hashable(x):
     if isinstance(x, collections_abc.MutableSequence):
         return tuple(x)
     elif isinstance(x, collections_abc.MutableMapping):
-        return tuple([(k,v) for k,v in x.items()])
+        return tuple(list(x.items()))
     else:
         return x
 
@@ -157,14 +154,15 @@ def param_union(*parameterizeds, **kwargs):
     warn = kwargs.pop('warn', True)
     if len(kwargs):
         raise TypeError(
-            "param_union() got an unexpected keyword argument '{}'".format(
-                kwargs.popitem()[0]))
-    d = dict()
+            f"param_union() got an unexpected keyword argument '{kwargs.popitem()[0]}'"
+        )
+
+    d = {}
     for o in parameterizeds:
         for k in o.param:
             if k != 'name':
                 if k in d and warn:
-                    get_logger().warning("overwriting parameter {}".format(k))
+                    get_logger().warning(f"overwriting parameter {k}")
                 d[k] = getattr(o, k)
     return d
 
@@ -226,7 +224,7 @@ def parameterized_class(name, params, bases=Parameterized):
     Dynamically create a parameterized class with the given name and the
     supplied parameters, inheriting from the specified base(s).
     """
-    if not (isinstance(bases, list) or isinstance(bases, tuple)):
+    if not (isinstance(bases, (list, tuple))):
         bases=[bases]
     return type(name, tuple(bases), params)
 
@@ -450,9 +448,7 @@ class Time(Parameterized):
             return False
         self_params = (self.timestep,self.until)
         other_params = (other.timestep,other.until)
-        if self_params != other_params:
-            return False
-        return True
+        return self_params == other_params
 
 
     def __ne__(self, other):
@@ -607,10 +603,7 @@ class Dynamic(Parameter):
         """
         gen = super(Dynamic,self).__get__(obj,objtype)
 
-        if not hasattr(gen,'_Dynamic_last'):
-            return gen
-        else:
-            return self._produce_value(gen)
+        return self._produce_value(gen) if hasattr(gen,'_Dynamic_last') else gen
 
 
     @instance_descriptor
@@ -676,10 +669,7 @@ class Dynamic(Parameter):
         """Return the last generated value for this parameter."""
         gen=super(Dynamic,self).__get__(obj,objtype)
 
-        if hasattr(gen,'_Dynamic_last'):
-            return gen._Dynamic_last
-        else:
-            return gen
+        return gen._Dynamic_last if hasattr(gen,'_Dynamic_last') else gen
 
 
     def _force(self,obj,objtype=None):
@@ -712,26 +702,10 @@ def get_soft_bounds(bounds, softbounds):
     returned. Otherwise it defaults to the hard bound. The hard bound
     could still be None.
     """
-    if bounds is None:
-        hl, hu = (None, None)
-    else:
-        hl, hu = bounds
-
-    if softbounds is None:
-        sl, su = (None, None)
-    else:
-        sl, su = softbounds
-
-    if sl is None or (hl is not None and sl<hl):
-        l = hl
-    else:
-        l = sl
-
-    if su is None or (hu is not None and su>hu):
-        u = hu
-    else:
-        u = su
-
+    hl, hu = (None, None) if bounds is None else bounds
+    sl, su = (None, None) if softbounds is None else softbounds
+    l = hl if sl is None or (hl is not None and sl<hl) else sl
+    u = hu if su is None or (hu is not None and su>hu) else su
     return (l, u)
 
 
@@ -817,10 +791,7 @@ class Number(Dynamic):
         All objects are accepted, and no exceptions will be raised.  See
         crop_to_bounds for details on how cropping is done.
         """
-        if not callable(val):
-            bounded_val = self.crop_to_bounds(val)
-        else:
-            bounded_val = val
+        bounded_val = val if callable(val) else self.crop_to_bounds(val)
         super(Number, self).__set__(obj, bounded_val)
 
     def crop_to_bounds(self, val):
@@ -846,13 +817,11 @@ class Number(Dynamic):
             if self.bounds is None:
                 return val
             vmin, vmax = self.bounds
-            if vmin is not None:
-                if val < vmin:
-                    return  vmin
+            if vmin is not None and val < vmin:
+                return  vmin
 
-            if vmax is not None:
-                if val > vmax:
-                    return vmax
+            if vmax is not None and val > vmax:
+                return vmax
 
         elif self.allow_None and val is None:
             return val
@@ -873,20 +842,18 @@ class Number(Dynamic):
                 if not val <= vmax:
                     raise ValueError("Parameter %r must be at most %s, "
                                      "not %s." % (self.name, vmax, val))
-            else:
-                if not val < vmax:
-                    raise ValueError("Parameter %r must be less than %s, "
-                                     "not %s." % (self.name, vmax, val))
+            elif not val < vmax:
+                raise ValueError("Parameter %r must be less than %s, "
+                                 "not %s." % (self.name, vmax, val))
 
         if vmin is not None:
             if incmin is True:
                 if not val >= vmin:
                     raise ValueError("Parameter %r must be at least %s, "
                                      "not %s." % (self.name, vmin, val))
-            else:
-                if not val > vmin:
-                    raise ValueError("Parameter %r must be greater than %s, "
-                                     "not %s." % (self.name, vmin, val))
+            elif not val > vmin:
+                raise ValueError("Parameter %r must be greater than %s, "
+                                 "not %s." % (self.name, vmin, val))
 
     def _validate_value(self, val, allow_None):
         if (allow_None and val is None) or callable(val):
@@ -991,9 +958,11 @@ class Tuple(Parameter):
         super(Tuple,self).__init__(default=default, **params)
         if length is None and default is not None:
             self.length = len(default)
-        elif length is None and default is None:
-            raise ValueError("%s: length must be specified if no default is supplied." %
-                             (self.name))
+        elif length is None:
+            raise ValueError(
+                f"{self.name}: length must be specified if no default is supplied."
+            )
+
         else:
             self.length = length
         self._validate(default)
@@ -1010,7 +979,7 @@ class Tuple(Parameter):
         if val is None and self.allow_None:
             return
 
-        if not len(val) == length:
+        if len(val) != length:
             raise ValueError("Tuple parameter %r is not of the correct "
                              "length (%d instead of %d)." %
                              (self.name, len(val), length))
@@ -1021,15 +990,11 @@ class Tuple(Parameter):
 
     @classmethod
     def serialize(cls, value):
-        if value is None:
-            return 'null'
-        return list(value) # As JSON has no tuple representation
+        return 'null' if value is None else list(value)
 
     @classmethod
     def deserialize(cls, value):
-        if value == 'null':
-            return None
-        return tuple(value) # As JSON has no tuple representation
+        return None if value == 'null' else tuple(value)
 
 
 class NumericTuple(Tuple):
@@ -1097,8 +1062,9 @@ def concrete_descendents(parentclass):
 
     Only non-abstract classes will be included.
     """
-    return dict((c.__name__,c) for c in descendents(parentclass)
-                if not _is_abstract(c))
+    return {
+        c.__name__: c for c in descendents(parentclass) if not _is_abstract(c)
+    }
 
 
 class Composite(Parameter):
@@ -1266,11 +1232,7 @@ class Selector(SelectorBase):
         if not (val in self.objects or (self.allow_None and val is None)):
             # This method can be called before __init__ has called
             # super's __init__, so there may not be any name set yet.
-            if (hasattr(self, "name") and self.name):
-                attrib_name = " " + self.name
-            else:
-                attrib_name = ""
-
+            attrib_name = f" {self.name}" if (hasattr(self, "name") and self.name) else ""
             items = []
             limiter = ']'
             length = 0
@@ -1292,7 +1254,7 @@ class Selector(SelectorBase):
         Subclasses can override if they support multiple items on a list,
         to check each item instead.
         """
-        if not (val in self.objects):
+        if val not in self.objects:
             self.objects.append(val)
 
     def get_range(self):
@@ -1338,7 +1300,7 @@ class ClassSelector(SelectorBase):
         if (val is None and self.allow_None):
             return
         if isinstance(class_, tuple):
-            class_name = ('(%s)' % ', '.join(cl.__name__ for cl in class_))
+            class_name = f"({', '.join(cl.__name__ for cl in class_)})"
         else:
             class_name = class_.__name__
         param_cls = self.__class__.__name__
@@ -1347,11 +1309,10 @@ class ClassSelector(SelectorBase):
                 raise ValueError(
                     "%s parameter %r value must be an instance of %s, not %r." %
                     (param_cls, self.name, class_name, val))
-        else:
-            if not (issubclass(val, class_)):
-                raise ValueError(
-                    "%s parameter %r must be a subclass of %s, not %r." %
-                    (param_cls, self.name, class_name, val.__name__))
+        elif not (issubclass(val, class_)):
+            raise ValueError(
+                "%s parameter %r must be a subclass of %s, not %r." %
+                (param_cls, self.name, class_name, val.__name__))
 
     def get_range(self):
         """
@@ -1366,7 +1327,7 @@ class ClassSelector(SelectorBase):
         classes = self.class_ if isinstance(self.class_, tuple) else (self.class_,)
         all_classes = {}
         for cls in classes:
-            all_classes.update(concrete_descendents(cls))
+            all_classes |= concrete_descendents(cls)
         d = OrderedDict((name, class_) for name,class_ in all_classes.items())
         if self.allow_None:
             d['None'] = None
@@ -1414,15 +1375,16 @@ class List(Parameter):
         l = len(val)
         if min_length is not None and max_length is not None:
             if not (min_length <= l <= max_length):
-                raise ValueError("%s: list length must be between %s and %s (inclusive)"%(self.name,min_length,max_length))
+                raise ValueError(
+                    f"{self.name}: list length must be between {min_length} and {max_length} (inclusive)"
+                )
+
         elif min_length is not None:
-            if not min_length <= l:
-                raise ValueError("%s: list length must be at least %s."
-                                 % (self.name, min_length))
+            if min_length > l:
+                raise ValueError(f"{self.name}: list length must be at least {min_length}.")
         elif max_length is not None:
-            if not l <= max_length:
-                raise ValueError("%s: list length must be at most %s."
-                                 % (self.name, max_length))
+            if l > max_length:
+                raise ValueError(f"{self.name}: list length must be at most {max_length}.")
 
     def _validate_value(self, val, allow_None):
         if allow_None and val is None:
@@ -1482,9 +1444,7 @@ class Array(ClassSelector):
 
     @classmethod
     def serialize(cls, value):
-        if value is None:
-            return 'null'
-        return value.tolist()
+        return 'null' if value is None else value.tolist()
 
     @classmethod
     def deserialize(cls, value):
@@ -1552,26 +1512,22 @@ class DataFrame(ClassSelector):
             self._length_bounds_check(self.columns, len(val.columns), 'Columns')
         elif isinstance(self.columns, (list, set)):
             self.ordered = isinstance(self.columns, list) if self.ordered is None else self.ordered
-            difference = set(self.columns) - set([str(el) for el in val.columns])
-            if difference:
+            if difference := set(self.columns) - {str(el) for el in val.columns}:
                 msg = 'Provided DataFrame columns {found} does not contain required columns {expected}'
                 raise ValueError(msg.format(found=list(val.columns), expected=sorted(self.columns)))
         else:
             self._length_bounds_check(self.columns, len(val.columns), 'Column')
 
-        if self.ordered:
-            if list(val.columns) != list(self.columns):
-                msg = 'Provided DataFrame columns {found} must exactly match {expected}'
-                raise ValueError(msg.format(found=list(val.columns), expected=self.columns))
+        if self.ordered and list(val.columns) != list(self.columns):
+            msg = 'Provided DataFrame columns {found} must exactly match {expected}'
+            raise ValueError(msg.format(found=list(val.columns), expected=self.columns))
 
         if self.rows is not None:
             self._length_bounds_check(self.rows, len(val), 'Row')
 
     @classmethod
     def serialize(cls, value):
-        if value is None:
-            return 'null'
-        return value.to_dict('records')
+        return 'null' if value is None else value.to_dict('records')
 
     @classmethod
     def deserialize(cls, value):
@@ -1660,7 +1616,7 @@ class resolve_path(ParameterizedFunction):
         p = ParamOverrides(self, params)
         path = os.path.normpath(path)
         ftype = "File" if p.path_to_file is True \
-            else "Folder" if p.path_to_file is False else "Path"
+                else "Folder" if p.path_to_file is False else "Path"
 
         if not p.search_paths:
             p.search_paths = [os.getcwd()]
@@ -1684,7 +1640,9 @@ class resolve_path(ParameterizedFunction):
 
                 paths_tried.append(try_path)
 
-            raise IOError(ftype + " " + os.path.split(path)[1] + " was not found in the following place(s): " + str(paths_tried) + ".")
+            raise IOError(
+                f"{ftype} {os.path.split(path)[1]} was not found in the following place(s): {paths_tried}."
+            )
 
 
 class normalize_path(ParameterizedFunction):
@@ -1748,12 +1706,17 @@ class Path(Parameter):
     def _validate(self, val):
         if val is None:
             if not self.allow_None:
-                Parameterized(name="%s.%s"%(self.owner.name,self.name)).param.warning('None is not allowed')
+                Parameterized(name=f"{self.owner.name}.{self.name}").param.warning(
+                    'None is not allowed'
+                )
+
         else:
             try:
                 self._resolve(val)
             except IOError as e:
-                Parameterized(name="%s.%s"%(self.owner.name,self.name)).param.warning('%s',e.args[0])
+                Parameterized(name=f"{self.owner.name}.{self.name}").param.warning(
+                    '%s', e.args[0]
+                )
 
     def __get__(self, obj, objtype):
         """
@@ -1902,7 +1865,7 @@ class MultiFileSelector(ListSelector):
 
     def update(self):
         self.objects = sorted(glob.glob(self.path))
-        if self.default and all([o in self.objects for o in self.default]):
+        if self.default and all(o in self.objects for o in self.default):
             return
         self.default = self.objects
 
@@ -1979,9 +1942,7 @@ class CalendarDate(Number):
 
     @classmethod
     def serialize(cls, value):
-        if value is None:
-            return 'null'
-        return value.strftime("%Y-%m-%d")
+        return 'null' if value is None else value.strftime("%Y-%m-%d")
 
     @classmethod
     def deserialize(cls, value):
@@ -2105,7 +2066,7 @@ class Range(NumericTuple):
         incmin, incmax = self.inclusive_bounds
         incmin = '[' if incmin else '('
         incmax = ']' if incmax else ')'
-        return '%s%s, %s%s' % (incmin, vmin, vmax, incmax)
+        return f'{incmin}{vmin}, {vmax}{incmax}'
 
 
 class DateRange(Range):
@@ -2154,7 +2115,7 @@ class DateRange(Range):
             serialized.append(v)
         return serialized
 
-    def deserialize(cls, value):
+    def deserialize(self, value):
         if value == 'null':
             return None
         deserialized = []
@@ -2190,17 +2151,14 @@ class CalendarDateRange(Range):
 
     @classmethod
     def serialize(cls, value):
-        if value is None:
-            return 'null'
-        # As JSON has no tuple representation
-        return [v.strftime("%Y-%m-%d") for v in value]
+        return 'null' if value is None else [v.strftime("%Y-%m-%d") for v in value]
 
     @classmethod
     def deserialize(cls, value):
         if value == 'null':
             return None
         # As JSON has no tuple representation
-        return tuple([dt.datetime.strptime(v, "%Y-%m-%d").date() for v in value])
+        return tuple(dt.datetime.strptime(v, "%Y-%m-%d").date() for v in value)
 
 
 class Event(Boolean):
@@ -2272,4 +2230,4 @@ def exceptions_summarized():
     except Exception:
         import sys
         etype, value, tb = sys.exc_info()
-        print("{}: {}".format(etype.__name__,value), file=sys.stderr)
+        print(f"{etype.__name__}: {value}", file=sys.stderr)

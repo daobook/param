@@ -18,7 +18,7 @@ except ImportError:
 
 
 def _is_array_and_equal(test,ref):
-    if not type(test) == numpy.ndarray:
+    if type(test) != numpy.ndarray:
         raise AssertionError
     numpy.testing.assert_array_equal(test,ref)
 

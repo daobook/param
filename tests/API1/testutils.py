@@ -35,14 +35,12 @@ guess_param_types_data = {
 }
 
 if np:
-    guess_param_types_data.update({
-        'Array':(np.ndarray([1, 2]), param.Array),
-    })
+    guess_param_types_data['Array'] = (np.ndarray([1, 2]), param.Array)
 if pd:
-    guess_param_types_data.update({
+    guess_param_types_data |= {
         'DataFrame': (pd.DataFrame(data=dict(a=[1])), param.DataFrame),
         'Series': (pd.Series([1, 2]), param.Series),
-    })
+    }
 
 @pytest.mark.parametrize('val,p', guess_param_types_data.values(), ids=guess_param_types_data.keys())
 def test_guess_param_types(val, p):
@@ -53,6 +51,6 @@ def test_guess_param_types(val, p):
     assert 'key' in output
     out_param = output['key']
     assert isinstance(out_param, p)
-    if not type(out_param) == param.Parameter:
+    if type(out_param) != param.Parameter:
         assert out_param.default is val
         assert out_param.constant
